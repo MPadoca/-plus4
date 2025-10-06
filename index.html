@@ -221,6 +221,15 @@
         .chart-container {
             height: 200px;
             margin-bottom: 20px;
+            position: relative;
+        }
+
+        .chart-data {
+            display: none;
+        }
+
+        .chart-data.active {
+            display: block;
         }
 
         .timeline-info {
@@ -378,9 +387,11 @@
                         <div class="chart-tab" onclick="switchTab('sealevel')">Sea Level</div>
                     </div>
                     <div class="chart-container">
-                        <canvas id="climateChart"></canvas>
+                        <canvas id="climateChart" class="chart-data active"></canvas>
+                        <canvas id="rainfallChart" class="chart-data"></canvas>
+                        <canvas id="sealevelChart" class="chart-data"></canvas>
                     </div>
-                    <div class="timeline-info">
+                    <div class="timeline-info" id="timelineInfo">
                         <div>
                             <div class="timeline-label">Today</div>
                             <div class="timeline-value" id="todayValue">--°F</div>
@@ -441,10 +452,11 @@
     </div>
 
     <script>
-        const API_KEY = '224ec137f84c21aa3f8831feac50209f';
+        const API_KEY = 'c8391c039501f3053b0f22faf7434153';
         let currentCity = 'Miami';
         let currentTempC = 0;
         let currentTempF = 0;
+        let currentTab = 'temperature';
 
         function enterApp() {
             document.getElementById('splashScreen').classList.add('hidden');
@@ -467,17 +479,83 @@
             document.getElementById(screen + 'Screen').classList.add('active');
             
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            event.currentTarget?.classList.add('active');
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+            
+            // Draw chart when showing future screen
+            if (screen === 'future') {
+                setTimeout(() => drawChart(), 100);
+            }
         }
 
         function showFuture() {
             showScreen('future');
-            drawChart();
+            setTimeout(() => drawChart(), 100);
         }
 
         function switchTab(tab) {
+            currentTab = tab;
             document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
             event.currentTarget.classList.add('active');
+            
+            document.querySelectorAll('.chart-data').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'temperature') {
+                document.getElementById('climateChart').classList.add('active');
+                updateTimelineInfo('temperature');
+                drawChart();
+            } else if (tab === 'rainfall') {
+                document.getElementById('rainfallChart').classList.add('active');
+                updateTimelineInfo('rainfall');
+                drawRainfallChart();
+            } else if (tab === 'sealevel') {
+                document.getElementById('sealevelChart').classList.add('active');
+                updateTimelineInfo('sealevel');
+                drawSeaLevelChart();
+            }
+        }
+
+        function updateTimelineInfo(type) {
+            const info = document.getElementById('timelineInfo');
+            
+            if (type === 'temperature') {
+                info.innerHTML = `
+                    <div>
+                        <div class="timeline-label">Today</div>
+                        <div class="timeline-value">${currentTempF}°F</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="timeline-label">2010+</div>
+                        <div class="timeline-value">Avg : ${currentTempF + 4}°F*D</div>
+                        <div class="timeline-change">+ ${4}°F</div>
+                    </div>
+                `;
+            } else if (type === 'rainfall') {
+                info.innerHTML = `
+                    <div>
+                        <div class="timeline-label">Today</div>
+                        <div class="timeline-value">60 in/year</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="timeline-label">2010+</div>
+                        <div class="timeline-value">Avg : 72 in/year</div>
+                        <div class="timeline-change">+ 20%</div>
+                    </div>
+                `;
+            } else if (type === 'sealevel') {
+                info.innerHTML = `
+                    <div>
+                        <div class="timeline-label">Today</div>
+                        <div class="timeline-value">0 ft</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="timeline-label">2010+</div>
+                        <div class="timeline-value">Avg : 3.3 ft</div>
+                        <div class="timeline-change">+ 1 meter</div>
+                    </div>
+                `;
+            }
         }
 
         function showInfo(type) {
@@ -556,15 +634,18 @@
 
         function drawChart() {
             const canvas = document.getElementById('climateChart');
+            if (!canvas) return;
+            
             const ctx = canvas.getContext('2d');
             const dpr = window.devicePixelRatio || 1;
             
-            canvas.width = canvas.offsetWidth * dpr;
-            canvas.height = canvas.offsetHeight * dpr;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
             ctx.scale(dpr, dpr);
             
-            const width = canvas.offsetWidth;
-            const height = canvas.offsetHeight;
+            const width = rect.width;
+            const height = rect.height;
             const padding = 30;
 
             ctx.clearRect(0, 0, width, height);
@@ -593,6 +674,106 @@
 
                 ctx.beginPath();
                 ctx.fillStyle = '#ff6b35';
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawRainfallChart() {
+            const canvas = document.getElementById('rainfallChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const width = rect.width;
+            const height = rect.height;
+            const padding = 30;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const years = [2024, 2040, 2060, 2080, 2100];
+            const rainfall = [60, 63, 66, 69, 72]; // inches per year, +20% by 2100
+
+            const maxRain = Math.max(...rainfall);
+            const minRain = Math.min(...rainfall);
+            const range = maxRain - minRain;
+
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+
+            years.forEach((year, i) => {
+                const x = padding + (width - padding * 2) * (i / (years.length - 1));
+                const y = height - padding - ((rainfall[i] - minRain) / range) * (height - padding * 2);
+                
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+
+            ctx.stroke();
+
+            years.forEach((year, i) => {
+                const x = padding + (width - padding * 2) * (i / (years.length - 1));
+                const y = height - padding - ((rainfall[i] - minRain) / range) * (height - padding * 2);
+
+                ctx.beginPath();
+                ctx.fillStyle = '#3b82f6';
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawSeaLevelChart() {
+            const canvas = document.getElementById('sealevelChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const width = rect.width;
+            const height = rect.height;
+            const padding = 30;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const years = [2024, 2040, 2060, 2080, 2100];
+            const seaLevel = [0, 0.5, 1.3, 2.3, 3.3]; // feet rise
+
+            const maxLevel = Math.max(...seaLevel);
+
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+
+            years.forEach((year, i) => {
+                const x = padding + (width - padding * 2) * (i / (years.length - 1));
+                const y = height - padding - (seaLevel[i] / maxLevel) * (height - padding * 2);
+                
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+
+            ctx.stroke();
+
+            years.forEach((year, i) => {
+                const x = padding + (width - padding * 2) * (i / (years.length - 1));
+                const y = height - padding - (seaLevel[i] / maxLevel) * (height - padding * 2);
+
+                ctx.beginPath();
+                ctx.fillStyle = '#06b6d4';
                 ctx.arc(x, y, 4, 0, Math.PI * 2);
                 ctx.fill();
             });
